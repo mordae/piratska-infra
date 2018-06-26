@@ -1,0 +1,179 @@
+= Pirátská infrastruktura: Hrubá technická specifikace
+Jitka Novotná <jitka.novotna@pirati.cz>; Jan Hamal Dvořák <jan.hamal.dvorak@pirati.cz>
+:numbered:
+:icons: font
+:lang: cs
+:note-caption: Poznámka
+:warning-caption: Pozor
+:example-caption: Schéma
+:toc-title: Obsah
+:toc: left
+
+== Identity
+
+=== Základní pohled
+
+.Tok informací o identitách (obecně)
+====
+[plantuml,align="center"]
+....
+@startuml
+left to right direction
+
+database LDAP
+component Keycloak
+
+package "Obslužné systémy" {
+  package Nalodění {
+  }
+
+  package People {
+  }
+}
+
+package "Koncový systém" {
+  component httpd
+  component Aplikace
+  database DB
+
+  Aplikace <-l-> DB
+  httpd <-l-> Aplikace
+
+  httpd <-u- Keycloak: "SSO, tj. zjištění identity"
+}
+
+component IdM
+
+DB <-u- IdM
+IdM <-u- LDAP
+
+Keycloak <-r-> LDAP
+Nalodění <-d-> LDAP
+People <-d-> LDAP
+
+@enduml
+....
+====
+
+LDAP::
+LDAP je zdrojem autoritativních informací o identitách. Do LDAPu zapisují pouze obslužné systémy jako Nalodění, People a také Keycloak SSO. Koncové systémy získávají data z LDAPu v rozsahu nutném pro svůj provoz prostřednictvím průběžné replikace s transformací.
+
+Keycloak::
+Keycloak poskytuje SSO (Single Sign-On), tedy jednotné přihlášení do ostatních systémů. Jako úložiště informací o uživatelích využívá právě LDAP. Z technických důvodů také umožňuje omezenou správu uživatelských účtů.
+
+IdM::
+Systém správy identit má zajišťovat přenos informací z autoritativního zdroje (LDAPu) do koncových systémů. Aktuálně je realizován jako dílčí aplikace, které přistupují do LDAPu s omezenými právy a průběžně replikují potřebné údaje do lokálních databází.
+
+Koncový systém::
+Z pohledu správy identit je koncový systém takový, který pouze čerpá informace z autoritativní databáze (LDAPu) a případně využívá jednotné přihlašování přes Keycloak, avšak sám již do LDAPu žádné údaje nezanáší.
+
+Obslužné systémy::
+Systémy **Nalodění** a **People** umožňují správu uživatelských účtů. Nalodění je samoobslužným systémem členů, People slouží především stranickému aparátu.
+
+
+<<<
+
+=== Obslužné systémy
+
+.Tok informací o identitách (obslužné systémy)
+====
+[plantuml,align="center"]
+....
+@startuml
+left to right direction
+
+database LDAP
+
+package Nalodění {
+}
+
+package People {
+}
+
+package Ostatní {
+}
+
+Nalodění <-d-> LDAP
+People <-d-> LDAP
+LDAP -d-> Ostatní
+
+:Každý: -d- Nalodění
+:Pověřené osoby \n (AO / PO): -d- People
+@enduml
+....
+====
+
+Nalodění::
+Systém Nalodění je určen všem uživatelům, kteří v něm mohou samoobslužně měnit údaje o sobě, měnit si způsob autentizace a požádat o odstranění ze systémů strany. Také zde mohou získat kompletní výpis dat, která o nich strana vede.
+
+People::
+Systém People slouží především odborům Administrativnímu a Personálnímu, které v něm spravují informace o uživatelích jednak vyplývající ze stanov (například je-li někdo zvolen, je potřeba to zavést do systému), ale také například informace o dobrovolnících. V tomto ohledu pak plní systém People roli podobnou CRM.
+
+
+<<<
+
+== Vlna
+
+Vlna má za cíl umožnit odesílání hromadných emailů a později textových zpráv při dodržení podmínek daných zákonem a tvořit tak kontaktní kanál s aktuálními adresami a čísly pro stranické funkcionáře a koordinátory dobrovolníků.
+
+
+.Závislosti mezi komponentami (Vlna)
+====
+[plantuml,align="center"]
+....
+@startuml
+
+database LDAP
+component "Keycloak" as sso
+
+package Vlna {
+  database DB
+
+  component httpd
+  component "Webová aplikace" as web
+  component "Replikace" as rep
+}
+
+cloud {
+  component "mailgun.com" as mailgun
+  mailgun <.r. web
+}
+
+sso .d.> LDAP
+
+httpd .r.> sso
+httpd .d.> web
+
+web .d.> DB
+DB <.r. rep
+rep .r.> LDAP
+@enduml
+....
+====
+
+
+=== Identity
+
+. Z ústředního LDAPu se do interní databáze Vlny přenáší:
+
+.. Názvy a identifikátory všech skupin
+.. Jména, emaily, čísla mobilů a příslušnosti ke skupinám všech osob
+
+. Pro vybrané skupiny se v databázi Vlny zakládají i odpovídající kanály.
+
+. Kromě běžného přihlášení přes SSO je možné se přihlásit i odkazem v přijatém emailu tak, aby mohl své odběry spravovat i uživatel, který nemá v LDAPu žádné heslo.
+
+
+=== Databáze
+
+. Vlna využívá určenou PostgreSQL databázi.
+
+. V databázi jsou uloženy:
+
+.. Replikované údaje z LDAPu
+.. Preference uživatelů, tedy zejména nastavení odběrů
+.. Rozpracovaná a historická vysílání
+.. Statistické informace z Mailgunu
+
+
+// vim:set spell spelllang=cs,en:
