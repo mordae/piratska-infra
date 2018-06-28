@@ -283,6 +283,40 @@ V tomto podstromu jsou především objekty standardních typů `applicationProc
 
 <<<
 
+== Migrace na nový systém identit
+
+=== Migrace primárního zdroje identit
+
+. Je nasazen LDAP s takovým způsobem ukládání hesel, který je kompatibilní s PirateID.
+
+. Nad LDAPem je zprovozněn Keycloak ve stavu, který umožňuje registraci nových uživatelů a který respektuje výše uvedené schéma LDAPu. Nejsou povoleny způsoby registrace, které nevytvoří místní heslo v LDAPu.
+
+. Uživatelské účty z fóra jsou jednorázově přesunuty z DB do LDAPu a na fóru je změněn způsob ověřování uživatelů tak, aby k němu docházelo nově pouze prostřednictvím SSO. Tento přechod je proveden s výpadkem fóra tak, aby nedošlo k odchylce v přenášených datech.
+
+. Je nasazen skript, který (v souladu s koncepcí výše) replikuje účty a hesla z LDAPu do databáze fóra pro udržení kompatibility s PirateID.
+
+. Veškeré aplikace, které nyní používají PirateID jsou postupně přenastaveny tak, aby využívaly Keycloak.
+
+. PirateID je odstaveno, již není potřeba. Také je zrušena replikace hesel do databáze fóra a tam uložená hesla jsou smazána.
+
+. Nyní je možné měnit způsob ukládání hesel libovolně dle možností LDAPu a povolit v Keycloaku přihlašování pomocí služeb třetích stran, kdy nedojde k vytvoření místního hesla.
+
+
+=== Implementace stranické logiky
+
+. Je nasazen skript, který replikuje skupiny z fóra do LDAPu dle aktuálních potřeb. V této fázi není cílem řídit kvalitu struktury skupin. Skript se může průběžně měnit. Snažíme se zjistit reálné požadavky provozu.
+
+. Koncové systémy, které již pracují s novým systémem LDAP/SSO využívají skupiny z fóra k řízení oprávnění uživatelů. Pokud potřebují informaci o skupinách i pro jiné účely než je kontrole oprávnění aktuálně přihlášeného uživatele, je souběžně nasazována replikace dat z LDAPu do místních databází.
+
+. Probíhá implementace systémů Nalodění a People.
+
+. Systém People umožňuje správu skupin oddělených od skupin z fóra a probíhá migrace řízení oprávnění směrem ke skupinám nastaveným tímto systémem.
+
+. Je zrušena replikace skupin z fóra do LDAPu, již není potřeba. Je nahrazena replikací v opačném směru -- systém People řídí příslušnost osob ke skupinám na fóru.
+
+
+<<<
+
 == Vlna
 
 WARNING: Tato sekce není úplná.
