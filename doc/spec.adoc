@@ -1,13 +1,23 @@
-= Pirátská infrastruktura: Hrubá technická specifikace
-Jitka Novotná <jitka.novotna@pirati.cz>; Jan Hamal Dvořák <jan.hamal.dvorak@pirati.cz>
+= Pirátská infrastruktura: Technická specifikace
+Jan Hamal Dvořák <jan.hamal.dvorak@pirati.cz>; Miroslav Brabenec <brabemi@gmail.com>; Jitka Novotná <jitka.novotna@pirati.cz>
 :numbered:
 :icons: font
 :lang: cs
+:table-caption: Tabulka
 :note-caption: Poznámka
 :warning-caption: Pozor
 :example-caption: Schéma
 :toc-title: Obsah
 :toc: left
+
+:y: icon:check[role="green"]
+:n: icon:times[role="red"]
+
+
+WARNING: Tento dokument je rozpracovaný, neúplný a neprošel řádnou oponenturou mimo kolektiv jeho autorů. Pokud se jím budete řídit, činíte tak na vlastní nebezpečí. Pro podrobnosti kontaktujte Jana Hamala Dvořáka na jeho Pirátském emailu nebo telefonicky na čísle 723{nbsp}671{nbsp}732.
+
+
+<<<
 
 == Identity
 
@@ -112,7 +122,170 @@ Systém People slouží především odborům Administrativnímu a Personálním
 
 <<<
 
+== LDAP
+
+=== Schéma
+
+.DN pro jednotlivé typy objektů
+[options="header",cols="<1,<3"]
+|===
+| DN
+| Typ objektů
+
+| `OU=People,O=Pirati`
+| Uživatelské účty
+
+| `OU=Groups,O=Pirati`
+| Skupiny uživatelů
+
+| `OU=Systems,O=Pirati`
+| Systémové účty přistupující do LDAPu
+|===
+
+
+==== OU=People,O=Pirati
+
+Aktuálně je jediný úplný uživatelský kmen ve fóru na platformě **phpBB**, proto jej budeme při migraci brát jako autoritativní zdroj informací o uživatelích. Uživatelské objekty mají standardní třídy `inetOrgPerson`, `organizationalPerson`, `person` a dále vlastní třídu `partyPerson`, ve které jsou atributy neobsažené ve standardních třídách.
+
+.Atributy uživatelských objektů
+[options="header",cols="<2,^1,^1,<5"]
+|===
+| Název
+| Četnost
+| Unikátní
+| Význam atributu
+
+| `cn`
+| 1
+| {y}
+| Primární unikátní identifikátor odpovídající ID na fóru, nebude se nikdy měnit. Keycloak bude v budoucnu generovat nová ID jako vzestupnou řadu.
+
+| `uid`
+| 1
+| {y}
+| Unikátní přihlašovací jméno uživatele, které je možné bezpečně změnit.
+
+| `mail`
+| 1
+| {y}
+| Unikátní email uživatele a alternativní přihlašovací jméno, které je možné bezpečně změnit. Zajištěný kanál pro komunikaci s uživatelem.
+
+| `mobile`
+| 0..1
+| {y}
+| Mobilní číslo uživatele, nepovinné.
+
+| `sn`
+| 1
+| {n}
+| Příjmení uživatele, povinné.
+
+| `givenName`
+| 1
+| {n}
+| Rodné (křestní) jméno uživatele, nepovinné.
+
+| `displayName`
+| 1
+| {n}
+| Kombinace `givenName` a `sn` oddělených mezerou.
+
+| `enabled`
+| 1
+| {n}
+| Stav uživatelského účtu -- aktivní / neaktivní.
+
+| `emailVerified`
+| 1
+| {n}
+| Stav ověření aktuálního emailu uživatele.
+
+| `partyEmail`
+| 0..1
+| {n}
+| Stranický email. Slouží především pro vytvoření aliasu a následnou prezentaci veřejnosti.
+
+| `userPassword`
+| 0..1
+| {n}
+| Zabezpečené heslo registrovaných osob.
+
+| `memberOf`
+| 0..n
+| {n}
+| Členství uživatele ve skupinách, zejména v LDAPovém podstromu `OU=Groups,O=Pirati`.
+|===
+
+<<<
+
+==== `OU=Groups,O=Pirati`
+
+V tomto podstromu budou postupně vznikat skupiny dle potřeb organizace. Objekty skupin jsou především standardního typu `groupOfUniqueNames` a vlastního typu `partyGroup`. Zatím nejsou známé žádné rozšiřující atributy.
+
+
+.Atributy objektů uživatelských skupin
+[options="header",cols="<2,^1,^1,<5"]
+|===
+| Název
+| Četnost
+| Unikátní
+| Význam atributu
+
+| `cn`
+| 1
+| {y}
+| Unikátní identifikátor skupiny.
+
+| `description`
+| 0..1
+| {n}
+| Podrobný popis skupiny.
+
+| `uniqueMember`
+| 0..n
+| {n}
+| Seznam členů dané skupiny.
+|===
+
+Konzistenci vazby mezi uživateli a skupinami zajišťuje LDAP, ale vzhledem k tomu, že by se ani jedno z `CN` nemělo měnit, stačí jenom automatické propisování atributů `member` a `uniqueMember`.
+
+NOTE: Potenciálně můžeme využít možnost členství skupin ve skupinách, ale případné výhody či nevýhody tohoto řešení vyžadují analýzu a další diskuzi.
+
+
+==== `OU=Systems,O=Pirati`
+
+V tomto podstromu jsou především objekty standardních typů `applicationProcess` a `simpleSecurityObject`. Tyto objekty slouží pro přihlašování systémových účtů, které mají omezený přístup k ostatním objektům a jejich atributům.
+
+.Atributy objektů klientských systémů
+[options="header",cols="<2,^1,^1,<5"]
+|===
+| Název
+| Četnost
+| Unikátní
+| Význam atributu
+
+| `cn`
+| 1
+| {y}
+| Unikátní přihlašovací jméno služby.
+
+| `userPassword`
+| 1
+| {n}
+| Zabezpečené heslo pro přihlašování.
+
+| `description`
+| 0..1
+| {n}
+| Případný popis přistupující služby.
+|===
+
+
+<<<
+
 == Vlna
+
+WARNING: Tato sekce není úplná.
 
 Vlna má za cíl umožnit odesílání hromadných emailů a později textových zpráv při dodržení podmínek daných zákonem a tvořit tak kontaktní kanál s aktuálními adresami a čísly pro stranické funkcionáře a koordinátory dobrovolníků.
 
