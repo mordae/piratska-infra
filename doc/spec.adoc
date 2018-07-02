@@ -289,7 +289,7 @@ V tomto podstromu jsou především objekty standardních typů `applicationProc
 
 . Je nasazen LDAP s takovým způsobem ukládání hesel, který je kompatibilní s PirateID.
 
-. Nad LDAPem je zprovozněn Keycloak ve stavu, který umožňuje registraci nových uživatelů a který respektuje výše uvedené schéma LDAPu. Nejsou povoleny způsoby registrace, které nevytvoří místní heslo v LDAPu.
+. Nad LDAPem je zprovozněn Keycloak ve stavu, který umožňuje registraci nových uživatelů a který respektuje výše uvedené schéma LDAPu.
 
 . Uživatelské účty z fóra jsou jednorázově přesunuty z DB do LDAPu a na fóru je změněn způsob ověřování uživatelů tak, aby k němu docházelo nově pouze prostřednictvím SSO. Tento přechod je proveden s výpadkem fóra tak, aby nedošlo k odchylce v přenášených datech.
 
@@ -298,8 +298,6 @@ V tomto podstromu jsou především objekty standardních typů `applicationProc
 . Veškeré aplikace, které nyní používají PirateID jsou postupně přenastaveny tak, aby využívaly Keycloak.
 
 . PirateID je odstaveno, již není potřeba. Také je zrušena replikace hesel do databáze fóra a tam uložená hesla jsou smazána.
-
-. Nyní je možné měnit způsob ukládání hesel libovolně dle možností LDAPu a povolit v Keycloaku přihlašování pomocí služeb třetích stran, kdy nedojde k vytvoření místního hesla.
 
 
 === Implementace stranické logiky
